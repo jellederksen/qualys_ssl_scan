@@ -33,11 +33,11 @@ max_errors='5'
 
 #functions
 usage() {
-	echo "usage: ${me} [ -h ] [ -H ] [ fqdn ] [ -e ] [ error grade ] [ -w ] [ warning grade ]
+	echo "usage: ${me} [ -h ] [ -H  www.example.com ] [ -e  error_grade ] [ -w  warning_grade ]
+	-h: show usage
 	-H: Get Qualys ssl scan grade
 	-w: Nagios warning level grade lexicographically after given
-	-e: Nagios critical level grade lexicographically after given
-	-h: show usage" >&2
+	-e: Nagios critical level grade lexicographically after given" >&2
 }
 
 get_pars() {
