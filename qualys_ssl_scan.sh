@@ -103,26 +103,37 @@ check_http_status() {
 }
 
 start_new_ssl_scan() {
-	#We start the counter at 1 so we don't confuse the user with
-	#an off by one error when setting the variable $max_retry.
+	#We start the counter at 1 so we don't confuse the user with an off by
+	#one error when setting the variable $max_retry.
 	for ((counter=1; counter <= max_retry; counter++)); do
 		sleep "$((counter **2))"
 		while IFS=',' read http_status scan_status; do
 			if ! check_http_status "${http_status}"; then
 				return 1
 			fi
+			#Check if the new scan request has been started.
+			#The scan will be started if the json .status is
+			#set to DNS or IN_PROGRESS.
 			if [[ $scan_status =~ DNS|IN_PROGRESS ]]; then
 				return 0
 			else
 				echo "${me}: error starting a new ssl scan"
 				return 1
 			fi
+		#Request the Qualys SSL scan API to start a new ssl scan for a
+		#host using Curl. Feed the output from the request to the jq
+		#Json processor using process substitution and filter out the
+		#status and remove all unnecessary quotes. Concatenate the
+		#output with the http status code separated by a comma. Parse
+		#the complete string to the while read loop.
 		done <<<"$(curl -s -w '%{http_code},' "${qualys_api_addr}/analyze?host=${1}&publish=${publish_results}&startNew=on" \
 		2> "${dn}" -o >(jq -r '.status' 2> "${dn}" | tr -d '"'))"
 	done
 }
 
 check_status_ssl_scan() {
+	#We start the counter at 1 so we don't confuse the user with
+	#an off by one error when setting the variable $max_retry.
 	for ((counter=1; counter <= max_retry; counter++)); do
 		while IFS=',' read http_status scan_status eta; do
 			if ! check_http_status "${http_status}"; then
@@ -136,6 +147,13 @@ check_status_ssl_scan() {
 				echo "${me}: error checking ssl scan status"
 				return 1
 			fi
+		#Request the Qualys SSL scan API for the started ssl scan
+		#current status using Curl. Feed the output from the request
+		#to the jq Json processor using process substitution and
+		#filter out the status and eta and remove all unnecessary
+		#quotes. Concatenate the output with the http status code
+		#separated by a comma. Parse the complete string to the while
+		#read loop.
 		done <<<"$(curl -s -w '%{http_code},' "${qualys_api_addr}/analyze?host=${1}&publish=${publish_results}" \
 		2> "${dn}" -o >(jq -r '[ .status, .endpoints[].eta ] | @csv' 2> "${dn}" | tr -d '"'))"
 	done
@@ -152,6 +170,11 @@ get_ssl_scan_grade() {
 			echo "host: $host grade: $grade"
 			return 0
 		fi
+	#Request the Qualys SSL scan API for the SSL scan grade for a host using
+	#Curl. Feed the output from the request to the jq Json processor using
+	#process substitution and filter out the status and remove all
+	#unnecessary quotes. Concatenate the output with the http status code
+	#separated by a comma. Parse the complete string to the while read loop.
 	done<<<"$(curl -s -w '%{http_code},' "${qualys_api_addr}/analyze?host=${1}&publish=${publish_results}" \
 	2> "${dn}" -o >(jq -r '[ .host, .endpoints[].grade ] | @csv' 2> "${dn}" | tr -d '"'))"
 }
@@ -168,9 +191,14 @@ nagios_ssl_scan_plugin() {
 			echo "Warning: ${host} ${grade} after ${warn_level}"
 			exit 1
 		else
-			echo "OK: ${host} grade ${grade}" 
+			echo "OK: ${host} grade ${grade}"
 			exit 0
 		fi
+	#Request the Qualys SSL scan API for the SSL scan grade for a host
+	#using Curl. Feed the output from the request to the jq Json processor
+	#using process substitution and filter out the status and remove all
+	#unnecessary quotes. Concatenate the output with the http status code
+	#separated by a comma. Parse the complete string to the while read loop.
 	done<<<"$(curl -s -w '%{http_code},' "${qualys_api_addr}/analyze?host=${1}&publish=${publish_results}" \
 	2> "${dn}" -o >(jq -r '[ .host, .endpoints[].grade ] | @csv' 2> "${dn}" | tr -d '"'))"
 }
