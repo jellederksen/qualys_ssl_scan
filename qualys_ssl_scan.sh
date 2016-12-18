@@ -49,6 +49,7 @@ get_pars() {
 		do
 			case "${n}" in
 			H)
+				#Add the host in OPTARG to the check_host array.
 				check_host+=("$OPTARG")
 				;;
 			h)
@@ -103,8 +104,10 @@ check_http_status() {
 }
 
 start_new_ssl_scan() {
-	#We start the counter at 1 so we don't confuse the user with an off by
-	#one error when setting the variable $max_retry.
+	#We start the counter at 1 so we don't confuse the user with
+	#an off by one error when setting the variable $max_retry. The
+	# max_retry counter sets the limit for the amount of times we
+	#request the Qualys SSL scan API for a new SSL scan.
 	for ((counter=1; counter <= max_retry; counter++)); do
 		sleep "$((counter **2))"
 		while IFS=',' read http_status scan_status; do
@@ -133,7 +136,9 @@ start_new_ssl_scan() {
 
 check_status_ssl_scan() {
 	#We start the counter at 1 so we don't confuse the user with
-	#an off by one error when setting the variable $max_retry.
+	#an off by one error when setting the variable $max_retry. The
+	# max_retry counter sets the limit for the amount of times we
+	#request the Qualys SSL scan API for the current SSL scan status.
 	for ((counter=1; counter <= max_retry; counter++)); do
 		while IFS=',' read http_status scan_status eta; do
 			if ! check_http_status "${http_status}"; then
@@ -160,6 +165,9 @@ check_status_ssl_scan() {
 }
 
 get_ssl_scan_grade() {
+	#We expects that the SSL scan is done and the results are ready. If
+	#not the check_status_ssl_scan function would have failed. So we don't
+	#Need a max_retry counter when fetching the SSL scan results.
 	while IFS=',' read http_status host grade; do
 		if ! check_http_status "${http_status}"; then
 			return 1
@@ -206,6 +214,9 @@ nagios_ssl_scan_plugin() {
 main() {
 	get_pars "${@}"
 	for i in "${check_host[@]}"; do
+		#When the error counter hist the max_errors threshold, exit
+		#the script. We dont just want to keep trying when there is
+		#probably something wrong with the script or Qualys SSL scan.
 		if [[ ${error_counter} -ge ${max_errors} ]]; then
 			echo "${me}: to many errors cannot continue"
 			exit 99
